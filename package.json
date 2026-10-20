@@ -1,0 +1,11 @@
+{
+  "name": "puntoventa-droid",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Mock local del contrato OpenAPI del MVP Punto de Venta",
+  "scripts": {
+    "mock": "node tools/mock-server.mjs"
+  },
+  "keywords": [],
+  "license": "UNLICENSED"
+}

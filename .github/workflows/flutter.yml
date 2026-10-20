@@ -1,0 +1,28 @@
+name: Flutter
+
+on:
+  pull_request:
+    paths:
+      - "app/**"
+      - ".github/workflows/flutter.yml"
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - ".github/workflows/flutter.yml"
+
+jobs:
+  analyze-and-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - run: dart run build_runner build --delete-conflicting-outputs
+      - run: flutter analyze
+      - run: flutter test

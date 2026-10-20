@@ -1,0 +1,31 @@
+# .NET
+**/bin/
+**/obj/
+*.user
+*.suo
+.vs/
+
+# Flutter / Dart
+**/.dart_tool/
+**/build/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/android/local.properties
+**/*.iml
+**/.idea/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Local configuration and signing material
+.env
+.env.*
+!.env.example
+**/appsettings.*.local.json
+*.jks
+*.keystore
+
+# OS/editor
+.DS_Store
+Thumbs.db
