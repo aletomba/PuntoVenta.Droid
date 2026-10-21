@@ -41,7 +41,7 @@ dotnet run --project api/PuntoVenta.Api
 - Readiness de PostgreSQL: `GET http://localhost:5039/health/ready`.
 - Swagger UI: `/swagger` en entorno Development.
 
-La cadena local de conexión de PostgreSQL se puede reemplazar mediante `ConnectionStrings__Default`. Las credenciales del `docker-compose.yml` son solo para desarrollo local.
+La cadena local de conexión de PostgreSQL se puede reemplazar mediante `ConnectionStrings__Default`. El contenedor expone PostgreSQL en el puerto `5433` del host para no chocar con una instalación local en `5432`. Las credenciales del `docker-compose.yml` son solo para desarrollo local.
 
 ## Mock del contrato
 
