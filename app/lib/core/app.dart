@@ -4,14 +4,25 @@ import 'package:go_router/go_router.dart';
 
 import '../features/products/product_form_screen.dart';
 import '../features/products/products_list_screen.dart';
+import '../features/sales/checkout_screen.dart';
+import '../features/sales/new_sale_screen.dart';
 import '../features/scanner/scanner_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final router = GoRouter(
     routes: [
+      GoRoute(path: '/', builder: (context, state) => const HomeScreen()),
       GoRoute(
-        path: '/',
-        builder: (context, state) => const HomeScreen(),
+        path: '/sales/new',
+        builder: (context, state) => const NewSaleScreen(),
+      ),
+      GoRoute(
+        path: '/sales/checkout',
+        builder: (context, state) => const CheckoutScreen(),
+      ),
+      GoRoute(
+        path: '/sales/scan',
+        builder: (context, state) => const ScannerScreen(),
       ),
       GoRoute(
         path: '/scan',
@@ -62,9 +73,9 @@ class HomeScreen extends StatelessWidget {
     if (code == null || !context.mounted) {
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Código escaneado: $code')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('Código escaneado: $code')));
   }
 
   @override
@@ -76,6 +87,12 @@ class HomeScreen extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             FilledButton.icon(
+              onPressed: () => context.push('/sales/new'),
+              icon: const Icon(Icons.point_of_sale),
+              label: const Text('Nueva venta'),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
               onPressed: () => _openScanner(context),
               icon: const Icon(Icons.qr_code_scanner),
               label: const Text('Escanear código'),
@@ -86,7 +103,7 @@ class HomeScreen extends StatelessWidget {
               icon: const Icon(Icons.inventory_2_outlined),
               label: const Text('Productos'),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             const Text('Base de la aplicación lista'),
           ],
         ),

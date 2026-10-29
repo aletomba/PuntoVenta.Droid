@@ -23,7 +23,7 @@ void main() {
     expect(settings.single.value, 'ARS');
   });
 
-  test('migrates schema v1 to v2 and preserves local settings', () async {
+  test('migrates schema v1 to v3 and preserves local settings', () async {
     await database.close();
     database = AppDatabase.forTesting(
       NativeDatabase.memory(
@@ -46,8 +46,11 @@ void main() {
     final settings = await database.select(database.localSettings).get();
     final products = await database.select(database.products).get();
 
+    final sales = await database.select(database.sales).get();
+
     expect(settings.single.value, 'ARS');
     expect(products, isEmpty);
-    expect(database.schemaVersion, 2);
+    expect(sales, isEmpty);
+    expect(database.schemaVersion, 3);
   });
 }
