@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/money.dart';
 import '../../data/products/products_repository.dart';
 
 class ProductsListScreen extends ConsumerWidget {
@@ -12,9 +13,7 @@ class ProductsListScreen extends ConsumerWidget {
     final productsAsync = ref.watch(productsListProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Productos'),
-      ),
+      appBar: AppBar(title: const Text('Productos')),
       floatingActionButton: FloatingActionButton(
         onPressed: () => context.push('/products/new'),
         child: const Icon(Icons.add),
@@ -34,13 +33,12 @@ class ProductsListScreen extends ConsumerWidget {
             separatorBuilder: (_, _) => const Divider(height: 1),
             itemBuilder: (context, index) {
               final product = products[index];
-              final price = (product.priceCents / 100).toStringAsFixed(2);
               return ListTile(
                 title: Text(product.name),
                 subtitle: Text(
                   'Código: ${product.barcode ?? "Sin código"} • Stock: ${product.stock}',
                 ),
-                trailing: Text('\$ $price'),
+                trailing: Text('\$ ${formatMoneyCents(product.priceCents)}'),
                 onTap: () => context.push('/products/${product.id}'),
               );
             },

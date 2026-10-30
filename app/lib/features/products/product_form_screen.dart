@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/money.dart';
 import '../../core/providers.dart';
 import '../../data/local/app_database.dart';
 import '../../data/products/products_repository.dart';
@@ -37,15 +38,15 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
 
   Future<void> _loadProduct() async {
     final db = ref.read(appDatabaseProvider);
-    final product = await (db.select(db.products)
-          ..where((tbl) => tbl.id.equals(widget.productId!)))
-        .getSingleOrNull();
+    final product = await (db.select(
+      db.products,
+    )..where((tbl) => tbl.id.equals(widget.productId!))).getSingleOrNull();
     if (product != null && mounted) {
       setState(() {
         _existingProduct = product;
         _barcodeController.text = product.barcode ?? '';
         _nameController.text = product.name;
-        _priceController.text = (product.priceCents / 100).toStringAsFixed(2);
+        _priceController.text = formatMoneyCents(product.priceCents);
         _stockController.text = product.stock.toString();
       });
     }
@@ -61,18 +62,11 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
   }
 
   Future<void> _scanBarcode() async {
-    final code = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => const ScannerScreen()),
-    );
+    final code = await Navigator.of(context)
+        .push<String>(MaterialPageRoute(builder: (_) => const ScannerScreen()));
     if (code != null && mounted) {
       _barcodeController.text = code;
     }
-  }
-
-  int _parsePriceCents(String text) {
-    final cleaned = text.trim().replaceAll(',', '.');
-    final value = double.tryParse(cleaned) ?? 0;
-    return (value * 100).round();
   }
 
   int _parseStock(String text) {
@@ -91,7 +85,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
         id: _existingProduct?.id,
         barcode: _barcodeController.text,
         name: _nameController.text,
-        priceCents: _parsePriceCents(_priceController.text),
+        priceCents: parseMoneyToCents(_priceController.text)!,
         stock: _parseStock(_stockController.text),
       );
       if (mounted) {
@@ -116,8 +110,14 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
         title: const Text('Eliminar producto'),
         content: const Text('Se marcará como eliminado (borrado lógico).'),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Eliminar')),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Eliminar'),
+          ),
         ],
       ),
     );
@@ -189,8 +189,13 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
             const SizedBox(height: 12),
             TextFormField(
               controller: _priceController,
-              decoration: const InputDecoration(labelText: 'Precio *', prefixText: '\$ '),
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'Precio *',
+                prefixText: '\$ ',
+              ),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
               ],
@@ -198,9 +203,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                 if (value == null || value.trim().isEmpty) {
                   return 'Ingresá un precio';
                 }
-                final cleaned = value.trim().replaceAll(',', '.');
-                final parsed = double.tryParse(cleaned);
-                if (parsed == null || parsed < 0) {
+                if (parseMoneyToCents(value) == null) {
                   return 'Precio inválido';
                 }
                 return null;
