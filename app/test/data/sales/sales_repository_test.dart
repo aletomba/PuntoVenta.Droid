@@ -1,4 +1,5 @@
 ﻿import 'package:drift/native.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:punto_venta/data/local/app_database.dart';
 import 'package:punto_venta/data/products/products_repository.dart';
@@ -116,6 +117,48 @@ void main() {
         database.products,
       )..where((product) => product.id.equals(available.id))).getSingle();
       expect(updatedAvailable.stock, 4);
+      final updatedUnavailable = await (database.select(
+        database.products,
+      )..where((product) => product.id.equals(unavailable.id))).getSingle();
+      expect(updatedUnavailable.stock, 0);
+    },
+  );
+
+  test(
+    'rejects a product deleted before sale and preserves database state',
+    () async {
+      final product = await productsRepository.create(
+        name: 'Producto eliminado',
+        priceCents: 500,
+        stock: 3,
+      );
+      await (database.update(database.products)
+            ..where((candidate) => candidate.id.equals(product.id)))
+          .write(const ProductsCompanion(isDeleted: Value(true)));
+      final cart = CartState(
+        items: [
+          CartItem(
+            id: 'deleted-line',
+            productId: product.id,
+            description: product.name,
+            unitPriceCents: product.priceCents,
+            quantity: 1,
+          ),
+        ],
+      );
+
+      await expectLater(
+        salesRepository.createSale(cart: cart, paymentMethod: 'cash'),
+        throwsA(isA<SaleValidationException>()),
+      );
+
+      expect(await database.select(database.sales).get(), isEmpty);
+      expect(await database.select(database.saleItems).get(), isEmpty);
+      final unchangedProduct = await (database.select(
+        database.products,
+      )..where((candidate) => candidate.id.equals(product.id))).getSingle();
+      expect(unchangedProduct.stock, 3);
+      expect(unchangedProduct.isDeleted, isTrue);
     },
   );
 
