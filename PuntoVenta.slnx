@@ -1,5 +1,5 @@
 <Solution>
   <Folder Name="/api/">
     <Project Path="api/PuntoVenta.Api/PuntoVenta.Api.csproj" />
-  </Folder>
+        <Project Path="api/PuntoVenta.Api.Tests/PuntoVenta.Api.Tests.csproj" />  </Folder>
 </Solution>
