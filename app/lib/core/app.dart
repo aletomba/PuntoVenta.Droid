@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../features/products/product_form_screen.dart';
+import '../features/products/products_list_screen.dart';
 import '../features/scanner/scanner_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -14,6 +16,21 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/scan',
         builder: (context, state) => const ScannerScreen(),
+      ),
+      GoRoute(
+        path: '/products',
+        builder: (context, state) => const ProductsListScreen(),
+      ),
+      GoRoute(
+        path: '/products/new',
+        builder: (context, state) => const ProductFormScreen(),
+      ),
+      GoRoute(
+        path: '/products/:id',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return ProductFormScreen(productId: id);
+        },
       ),
     ],
   );
@@ -62,6 +79,12 @@ class HomeScreen extends StatelessWidget {
               onPressed: () => _openScanner(context),
               icon: const Icon(Icons.qr_code_scanner),
               label: const Text('Escanear código'),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () => context.push('/products'),
+              icon: const Icon(Icons.inventory_2_outlined),
+              label: const Text('Productos'),
             ),
             const SizedBox(height: 12),
             const Text('Base de la aplicación lista'),
