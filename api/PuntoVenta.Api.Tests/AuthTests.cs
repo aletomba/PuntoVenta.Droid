@@ -131,6 +131,49 @@ public sealed class AuthTests : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    public async Task Intentos_fallidos_concurrentes_no_eluden_el_bloqueo()
+    {
+        var email = NewEmail();
+        await _factory.SeedUserAsync(Guid.NewGuid(), email, "Secreta123!", Roles.Cajero);
+
+        var results = await Task.WhenAll(Enumerable.Range(0, 12).Select(_ =>
+            _client.PostAsJsonAsync("/auth/login", new { email, password = "mala" })));
+        Assert.All(results, r => Assert.Equal(HttpStatusCode.Unauthorized, r.StatusCode));
+
+        var user = await _factory.WithDbAsync(db => db.Users.SingleAsync(u => u.Email == email));
+        // Las solicitudes que ya vieron el bloqueo no cuentan; ninguna actualización se pierde: >= máximo.
+        Assert.InRange(user.FailedLoginAttempts, 5, 12);
+        Assert.NotNull(user.LockoutEndUtc);
+        await AssertError(await _client.PostAsJsonAsync("/auth/login", new { email, password = "Secreta123!" }),
+            HttpStatusCode.Unauthorized, "account_locked");
+    }
+
+    [Fact]
+    public async Task Refresh_concurrente_con_el_mismo_token_solo_rota_una_vez_y_revoca_las_sesiones()
+    {
+        var email = NewEmail();
+        await _factory.SeedUserAsync(Guid.NewGuid(), email, "Secreta123!", Roles.Cajero);
+        var first = await _factory.LoginOkAsync(_client, email, "Secreta123!");
+
+        var results = await Task.WhenAll(Enumerable.Range(0, 8).Select(_ =>
+            _client.PostAsJsonAsync("/auth/refresh", new { refreshToken = first.RefreshToken })));
+
+        var ok = results.Where(r => r.IsSuccessStatusCode).ToList();
+        Assert.Single(ok);
+        foreach (var r in results.Where(r => !r.IsSuccessStatusCode))
+        {
+            await AssertError(r, HttpStatusCode.Unauthorized, "invalid_refresh_token");
+        }
+
+        // Las perdedoras detectaron el conflicto: toda sesión activa del usuario quedó revocada.
+        var winner = (await ok[0].Content.ReadFromJsonAsync<TokenResponse>())!;
+        await AssertError(await _client.PostAsJsonAsync("/auth/refresh", new { refreshToken = winner.RefreshToken }),
+            HttpStatusCode.Unauthorized, "invalid_refresh_token");
+        var active = await _factory.WithDbAsync(db => db.RefreshTokens.CountAsync(t => t.RevokedAt == null && t.User!.Email == email));
+        Assert.Equal(0, active);
+    }
+
+    [Fact]
     public async Task Refresh_rota_el_token_y_el_anterior_queda_invalido()
     {
         var email = NewEmail();

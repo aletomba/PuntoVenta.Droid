@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using PuntoVenta.Api.Auth;
 using PuntoVenta.Api.Data;
 
@@ -36,7 +37,19 @@ public sealed class PermissionProbeController : ControllerBase
 public sealed class ApiFactory : WebApplicationFactory<Program>
 {
     public TestClock Clock { get; } = new();
-    private readonly string _dbName = Guid.NewGuid().ToString();
+    private readonly string _dbPath = Path.Combine(Path.GetTempPath(), $"puntoventa-tests-{Guid.NewGuid():N}.db");
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        if (disposing)
+        {
+            foreach (var f in new[] { _dbPath, _dbPath + "-wal", _dbPath + "-shm", _dbPath + "-journal" })
+            {
+                try { File.Delete(f); } catch (IOException) { }
+            }
+        }
+    }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -57,11 +70,20 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
                 services.Remove(d);
             }
 
-            services.AddDbContext<AppDbContext>(o => o.UseInMemoryDatabase(_dbName));
+            // SQLite (archivo temporal) soporta ExecuteUpdate y concurrencia real entre contextos.
+            services.AddDbContext<AppDbContext>(o => o.UseSqlite($"Data Source={_dbPath};Pooling=False"));
             services.RemoveAll<TimeProvider>();
             services.AddSingleton<TimeProvider>(Clock);
             services.AddControllers().AddApplicationPart(typeof(PermissionProbeController).Assembly);
         });
+    }
+
+    protected override IHost CreateHost(IHostBuilder builder)
+    {
+        var host = base.CreateHost(builder);
+        using var scope = host.Services.CreateScope();
+        scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.EnsureCreated();
+        return host;
     }
 
     public async Task<User> SeedUserAsync(Guid tenantId, string email, string password, string role, bool active = true)
