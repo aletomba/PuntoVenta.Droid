@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/money.dart';
 import '../../data/sales/sales_repository.dart';
 import 'cart_provider.dart';
+import 'ticket_service.dart';
 
 class CheckoutScreen extends ConsumerStatefulWidget {
   const CheckoutScreen({super.key});
@@ -24,6 +25,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
   String _paymentMethod = 'cash';
   bool _saving = false;
+  final _ticketService = TicketService();
 
   Future<void> _confirmSale() async {
     final cart = ref.read(cartProvider);
@@ -32,28 +34,75 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     }
 
     setState(() => _saving = true);
+    late final String saleId;
     try {
-      await ref
+      saleId = await ref
           .read(salesRepositoryProvider)
           .createSale(cart: cart, paymentMethod: _paymentMethod);
-      ref.read(cartProvider.notifier).clear();
-      if (!mounted) {
-        return;
-      }
-      context.go('/');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Venta guardada sin conexión.')),
-      );
     } on SaleValidationException catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(error.message)));
       }
+      return;
     } finally {
       if (mounted) {
         setState(() => _saving = false);
       }
+    }
+
+    ref.read(cartProvider.notifier).clear();
+    if (!mounted) {
+      return;
+    }
+
+    final shouldShare = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Venta guardada'),
+        content: const Text('¿Compartir ticket en PDF?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('No'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Compartir'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) {
+      return;
+    }
+
+    String? ticketError;
+    if (shouldShare == true) {
+      try {
+        final file = await _ticketService.generatePdf(
+          saleId: saleId,
+          cart: cart,
+          paymentMethod: _paymentMethod,
+        );
+        await _ticketService.shareTicket(file);
+      } on TicketException catch (error) {
+        ticketError = error.message;
+      }
+    }
+
+    if (mounted) {
+      context.go('/');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            ticketError == null
+                ? 'Venta guardada sin conexión.'
+                : 'Venta guardada. $ticketError',
+          ),
+        ),
+      );
     }
   }
 
