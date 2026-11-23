@@ -188,6 +188,102 @@ void main() {
     expect(await database.select(database.sales).get(), isEmpty);
   });
 
+  test('only an admin can void a sale', () async {
+    final product = await productsRepository.create(
+      name: 'Yerba',
+      priceCents: 1250,
+      stock: 3,
+    );
+    final saleId = await salesRepository.createSale(
+      cart: CartState(
+        items: [
+          CartItem(
+            id: 'product-line',
+            productId: product.id,
+            description: product.name,
+            unitPriceCents: product.priceCents,
+            quantity: 2,
+          ),
+        ],
+      ),
+      paymentMethod: 'cash',
+    );
+
+    await expectLater(
+      salesRepository.voidSale(
+        saleId: saleId,
+        actorUserId: 'cashier-user',
+        actorRole: SaleActorRole.cashier,
+        reason: 'Error de carga',
+      ),
+      throwsA(isA<SaleAuthorizationException>()),
+    );
+
+    final sale = await (database.select(
+      database.sales,
+    )..where((sale) => sale.id.equals(saleId))).getSingle();
+    final unchangedProduct = await (database.select(
+      database.products,
+    )..where((candidate) => candidate.id.equals(product.id))).getSingle();
+    expect(sale.status, 'active');
+    expect(unchangedProduct.stock, 1);
+  });
+
+  test(
+    'admin void restores stock once and leaves the sale pending sync',
+    () async {
+      final product = await productsRepository.create(
+        name: 'Yerba',
+        priceCents: 1250,
+        stock: 3,
+      );
+      final saleId = await salesRepository.createSale(
+        cart: CartState(
+          items: [
+            CartItem(
+              id: 'product-line',
+              productId: product.id,
+              description: product.name,
+              unitPriceCents: product.priceCents,
+              quantity: 2,
+            ),
+          ],
+        ),
+        paymentMethod: 'cash',
+      );
+      await (database.update(database.sales)
+            ..where((sale) => sale.id.equals(saleId)))
+          .write(const SalesCompanion(synced: Value(true)));
+
+      final voidedSale = await salesRepository.voidSale(
+        saleId: saleId,
+        actorUserId: 'admin-user',
+        actorRole: SaleActorRole.admin,
+        reason: 'Error de carga',
+      );
+      final repeatedVoid = await salesRepository.voidSale(
+        saleId: saleId,
+        actorUserId: 'admin-user',
+        actorRole: SaleActorRole.admin,
+        reason: 'Error de carga',
+      );
+
+      final savedSale = await (database.select(
+        database.sales,
+      )..where((sale) => sale.id.equals(saleId))).getSingle();
+      final updatedProduct = await (database.select(
+        database.products,
+      )..where((candidate) => candidate.id.equals(product.id))).getSingle();
+      expect(voidedSale.status, 'voided');
+      expect(voidedSale.voidReason, 'Error de carga');
+      expect(voidedSale.voidedByUserId, 'admin-user');
+      expect(voidedSale.voidedAt, isNotNull);
+      expect(repeatedVoid.voidedAt, voidedSale.voidedAt);
+      expect(savedSale.synced, isFalse);
+      expect(updatedProduct.stock, 3);
+    },
+  );
+
   test('loads a sale with its line items for the detail view', () async {
     final saleId = await salesRepository.createSale(
       cart: const CartState(
