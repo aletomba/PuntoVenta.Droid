@@ -41,6 +41,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         return;
       }
 
+      ref.invalidate(authSessionProvider);
       final messenger = ScaffoldMessenger.of(context);
       context.go('/');
       messenger.showSnackBar(

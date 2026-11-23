@@ -81,6 +81,32 @@ void main() {
     );
     expect(tokenStore.savedTokens, isNull);
   });
+
+  test(
+    'reads the Admin role and user id from the stored access token',
+    () async {
+      tokenStore.savedTokens = AuthTokens(
+        accessToken: _tokenWithClaims({'sub': 'admin-user', 'role': 'Admin'}),
+        refreshToken: 'refresh-token',
+        expiresAt: DateTime.now().toUtc().add(const Duration(minutes: 5)),
+      );
+
+      final session = await repository.currentSession();
+
+      expect(session?.userId, 'admin-user');
+      expect(session?.role, AuthRole.admin);
+    },
+  );
+
+  test('does not expose a session after the access token expires', () async {
+    tokenStore.savedTokens = AuthTokens(
+      accessToken: _tokenWithClaims({'sub': 'admin-user', 'role': 'Admin'}),
+      refreshToken: 'refresh-token',
+      expiresAt: DateTime.now().toUtc().subtract(const Duration(seconds: 1)),
+    );
+
+    expect(await repository.currentSession(), isNull);
+  });
 }
 
 class _MemoryAuthTokenStore implements AuthTokenStore {
@@ -90,6 +116,9 @@ class _MemoryAuthTokenStore implements AuthTokenStore {
   Future<void> save(AuthTokens tokens) async {
     savedTokens = tokens;
   }
+
+  @override
+  Future<AuthTokens?> read() async => savedTokens;
 }
 
 class _LoginAdapter implements HttpClientAdapter {
@@ -115,4 +144,9 @@ class _LoginAdapter implements HttpClientAdapter {
 
   @override
   void close({bool force = false}) {}
+}
+
+String _tokenWithClaims(Map<String, Object> claims) {
+  final payload = base64Url.encode(utf8.encode(jsonEncode(claims)));
+  return 'header.$payload.signature';
 }

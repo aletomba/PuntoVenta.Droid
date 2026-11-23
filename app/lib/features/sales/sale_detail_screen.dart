@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/money.dart';
+import '../../data/auth/auth_repository.dart';
 import '../../data/sales/sales_repository.dart';
 import 'sale_display_formatters.dart';
 
@@ -13,6 +14,7 @@ class SaleDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final details = ref.watch(saleDetailsProvider(saleId));
+    final session = ref.watch(authSessionProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Detalle de venta')),
       body: details.when(
@@ -85,10 +87,143 @@ class SaleDetailScreen extends ConsumerWidget {
                   title: const Text('Anulada el'),
                   subtitle: Text(formatSaleDateTime(context, sale.voidedAt!)),
                 ),
+              if (!isVoided)
+                session.when(
+                  data: (currentSession) {
+                    if (currentSession?.role == AuthRole.admin) {
+                      return FilledButton.icon(
+                        onPressed: () =>
+                            _voidSale(context, ref, sale.id, currentSession!),
+                        icon: const Icon(Icons.cancel_outlined),
+                        label: const Text('Anular venta'),
+                      );
+                    }
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Text(
+                        currentSession?.role == AuthRole.cashier
+                            ? 'Solo Admin puede anular ventas.'
+                            : 'Inicia sesión con una cuenta Admin para anular.',
+                        textAlign: TextAlign.center,
+                      ),
+                    );
+                  },
+                  loading: () => const SizedBox.shrink(),
+                  error: (error, stackTrace) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Text(
+                      'No se pudo verificar el rol: $error',
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
             ],
           );
         },
       ),
+    );
+  }
+}
+
+Future<void> _voidSale(
+  BuildContext context,
+  WidgetRef ref,
+  String saleId,
+  AuthSession session,
+) async {
+  final reason = await showDialog<String>(
+    context: context,
+    builder: (context) => const _VoidSaleReasonDialog(),
+  );
+  if (reason == null) {
+    return;
+  }
+
+  try {
+    await ref
+        .read(salesRepositoryProvider)
+        .voidSale(
+          saleId: saleId,
+          actorUserId: session.userId,
+          actorRole: session.role == AuthRole.admin
+              ? SaleActorRole.admin
+              : SaleActorRole.cashier,
+          reason: reason,
+        );
+    ref.invalidate(saleDetailsProvider(saleId));
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Venta anulada localmente; queda pendiente de sync.'),
+        ),
+      );
+    }
+  } on SaleValidationException catch (error) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
+    }
+  } on SaleAuthorizationException catch (error) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
+    }
+  }
+}
+
+class _VoidSaleReasonDialog extends StatefulWidget {
+  const _VoidSaleReasonDialog();
+
+  @override
+  State<_VoidSaleReasonDialog> createState() => _VoidSaleReasonDialogState();
+}
+
+class _VoidSaleReasonDialogState extends State<_VoidSaleReasonDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _reasonController = TextEditingController();
+
+  @override
+  void dispose() {
+    _reasonController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+    Navigator.of(context).pop(_reasonController.text.trim());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Anular venta'),
+      content: Form(
+        key: _formKey,
+        child: TextFormField(
+          controller: _reasonController,
+          autofocus: true,
+          maxLength: 500,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            labelText: 'Motivo',
+            border: OutlineInputBorder(),
+          ),
+          validator: (value) => value == null || value.trim().isEmpty
+              ? 'Ingresa el motivo de anulación.'
+              : null,
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(onPressed: _submit, child: const Text('Anular')),
+      ],
     );
   }
 }
