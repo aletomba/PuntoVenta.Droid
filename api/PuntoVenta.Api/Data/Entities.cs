@@ -64,3 +64,31 @@ public sealed class Product
     public DateTime UpdatedAt { get; set; }
     public bool IsDeleted { get; set; }
 }
+
+public sealed class Sale
+{
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public Guid UserId { get; set; }
+    public DateTime Date { get; set; }
+    public long TotalCents { get; set; }
+    public string PaymentMethod { get; set; } = string.Empty;
+    public string Status { get; set; } = "active";
+    public DateTime? VoidedAt { get; set; }
+    public Guid? VoidedByUserId { get; set; }
+    public string? VoidReason { get; set; }
+    public List<SaleItem> Items { get; set; } = [];
+}
+
+public sealed class SaleItem
+{
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public Guid SaleId { get; set; }
+    public Sale? Sale { get; set; }
+    public Guid? ProductId { get; set; }
+    public Product? Product { get; set; }
+    public string Description { get; set; } = string.Empty;
+    public int Quantity { get; set; }
+    public long UnitPriceCents { get; set; }
+}
