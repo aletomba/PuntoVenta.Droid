@@ -47,3 +47,20 @@ public sealed class RefreshToken
     /// <summary>Token de concurrencia para que una rotación concurrente solo gane una vez.</summary>
     public Guid ConcurrencyStamp { get; set; } = Guid.NewGuid();
 }
+
+public sealed class Product
+{
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public Tenant? Tenant { get; set; }
+
+    /// <summary>Único por tenant, puede ser nulo (venta con precio libre).</summary>
+    public string? Barcode { get; set; }
+    public string Name { get; set; } = string.Empty;
+    
+    /// <summary>Precio en centavos.</summary>
+    public int PriceCents { get; set; }
+    public int Stock { get; set; }
+    public DateTime UpdatedAt { get; set; }
+    public bool IsDeleted { get; set; }
+}
