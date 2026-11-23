@@ -15,6 +15,17 @@ class SaleValidationException implements Exception {
   String toString() => message;
 }
 
+class SaleAuthorizationException implements Exception {
+  const SaleAuthorizationException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
+enum SaleActorRole { admin, cashier }
+
 class SalesRepository {
   SalesRepository(this._database);
 
@@ -132,6 +143,101 @@ class SalesRepository {
     });
 
     return saleId;
+  }
+
+  Future<Sale> voidSale({
+    required String saleId,
+    required String actorUserId,
+    required SaleActorRole actorRole,
+    required String reason,
+  }) async {
+    if (actorRole != SaleActorRole.admin) {
+      throw const SaleAuthorizationException('Solo Admin puede anular ventas.');
+    }
+
+    final normalizedReason = reason.trim();
+    if (actorUserId.trim().isEmpty ||
+        normalizedReason.isEmpty ||
+        normalizedReason.length > 500) {
+      throw const SaleValidationException(
+        'El usuario y el motivo de anulación son obligatorios.',
+      );
+    }
+
+    final now = DateTime.now().toUtc();
+    return _database.transaction(() async {
+      final sale = await (_database.select(
+        _database.sales,
+      )..where((candidate) => candidate.id.equals(saleId))).getSingleOrNull();
+      if (sale == null) {
+        throw const SaleValidationException('La venta no existe.');
+      }
+      if (sale.status == 'voided') {
+        return sale;
+      }
+      if (sale.status != 'active') {
+        throw const SaleValidationException(
+          'La venta no se puede anular en su estado actual.',
+        );
+      }
+
+      final items = await (_database.select(
+        _database.saleItems,
+      )..where((item) => item.saleId.equals(saleId))).get();
+      final quantitiesByProduct = <String, int>{};
+      for (final item in items) {
+        final productId = item.productId;
+        if (productId != null) {
+          quantitiesByProduct.update(
+            productId,
+            (quantity) => quantity + item.quantity,
+            ifAbsent: () => item.quantity,
+          );
+        }
+      }
+
+      for (final entry in quantitiesByProduct.entries) {
+        final product =
+            await (_database.select(_database.products)
+                  ..where((candidate) => candidate.id.equals(entry.key)))
+                .getSingleOrNull();
+        if (product == null) {
+          throw const SaleValidationException(
+            'No se encontró un producto de la venta.',
+          );
+        }
+        await (_database.update(
+          _database.products,
+        )..where((candidate) => candidate.id.equals(entry.key))).write(
+          ProductsCompanion(
+            stock: Value(product.stock + entry.value),
+            updatedAt: Value(now),
+          ),
+        );
+      }
+
+      final voidedSale = sale.copyWith(
+        status: 'voided',
+        voidedAt: Value(now),
+        voidedByUserId: Value(actorUserId.trim()),
+        voidReason: Value(normalizedReason),
+        synced: false,
+      );
+      await (_database.update(
+        _database.sales,
+      )..where((candidate) => candidate.id.equals(saleId))).write(
+        SalesCompanion(
+          status: Value(voidedSale.status),
+          voidedAt: Value(voidedSale.voidedAt),
+          voidedByUserId: Value(voidedSale.voidedByUserId),
+          voidReason: Value(voidedSale.voidReason),
+          synced: Value(false),
+        ),
+      );
+      return (_database.select(
+        _database.sales,
+      )..where((candidate) => candidate.id.equals(saleId))).getSingle();
+    });
   }
 }
 
