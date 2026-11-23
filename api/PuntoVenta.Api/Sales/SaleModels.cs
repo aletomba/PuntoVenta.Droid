@@ -16,6 +16,9 @@ public sealed record SaleItemInput(
     [Range(0, long.MaxValue)]
     [property: JsonRequired] long UnitPriceCents);
 
+public sealed record VoidSaleRequest(
+    [Required(AllowEmptyStrings = true), StringLength(500, MinimumLength = 1)] string? Reason);
+
 public sealed record SaleItemResponse(
     Guid Id,
     Guid? ProductId,

@@ -6,6 +6,7 @@ namespace PuntoVenta.Api.Sales;
 public interface ISalesService
 {
     Task<SaleResponse> CreateAsync(Guid tenantId, Guid userId, SaleInput input, CancellationToken ct);
+    Task<SaleResponse> VoidAsync(Guid tenantId, Guid userId, Guid id, string reason, CancellationToken ct);
     Task<List<SaleResponse>> ListAsync(
         Guid tenantId,
         DateTimeOffset? from,
@@ -129,6 +130,55 @@ public sealed class SalesService(AppDbContext db, TimeProvider clock) : ISalesSe
             .ThenBy(s => s.Id)
             .ToListAsync(ct);
         return sales.Select(Map).ToList();
+    }
+
+    public async Task<SaleResponse> VoidAsync(
+        Guid tenantId, Guid userId, Guid id, string reason, CancellationToken ct)
+    {
+        var now = clock.GetUtcNow().UtcDateTime;
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var changed = await db.Sales
+            .Where(s => s.TenantId == tenantId && s.Id == id && s.Status == "active")
+            .ExecuteUpdateAsync(update => update
+                .SetProperty(s => s.Status, "voided")
+                .SetProperty(s => s.VoidedAt, now)
+                .SetProperty(s => s.VoidedByUserId, userId)
+                .SetProperty(s => s.VoidReason, reason), ct);
+
+        var sale = await FindSaleAsync(tenantId, id, ct)
+            ?? throw new ApiException("not_found", "Venta no encontrada.", StatusCodes.Status404NotFound);
+
+        if (changed == 1)
+        {
+            var quantities = sale.Items
+                .Where(item => item.ProductId.HasValue)
+                .GroupBy(item => item.ProductId!.Value)
+                .Select(group => new { ProductId = group.Key, Quantity = group.Sum(item => (long)item.Quantity) })
+                .OrderBy(item => item.ProductId);
+
+            foreach (var item in quantities)
+            {
+                if (item.Quantity > int.MaxValue)
+                    throw new InvalidOperationException("La cantidad de la venta excede el límite de stock.");
+
+                var quantity = (int)item.Quantity;
+                var updated = await db.Products
+                    .Where(p => p.TenantId == tenantId && p.Id == item.ProductId &&
+                                p.Stock <= int.MaxValue - quantity)
+                    .ExecuteUpdateAsync(update => update
+                        .SetProperty(p => p.Stock, p => p.Stock + quantity)
+                        .SetProperty(p => p.UpdatedAt, now), ct);
+                if (updated != 1)
+                    throw new InvalidOperationException("No se pudo reponer el stock de la venta.");
+            }
+        }
+        else if (sale.Status != "voided")
+        {
+            throw new InvalidOperationException("La venta tiene un estado inválido para anulación.");
+        }
+
+        await transaction.CommitAsync(ct);
+        return Map(sale);
     }
 
     private async Task<Sale?> FindSaleAsync(Guid tenantId, Guid id, CancellationToken ct) =>
