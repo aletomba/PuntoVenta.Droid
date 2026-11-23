@@ -100,6 +100,82 @@ namespace PuntoVenta.Api.Data.Migrations
                     b.ToTable("RefreshTokens");
                 });
 
+            modelBuilder.Entity("PuntoVenta.Api.Data.Sale", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PaymentMethod")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<long>("TotalCents")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("VoidReason")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("VoidedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("VoidedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("TenantId", "Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("TenantId", "Date");
+
+                    b.ToTable("Sales");
+                });
+
+            modelBuilder.Entity("PuntoVenta.Api.Data.SaleItem", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SaleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("UnitPriceCents")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("TenantId", "SaleId", "Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.ToTable("SaleItems");
+                });
+
             modelBuilder.Entity("PuntoVenta.Api.Data.Tenant", b =>
                 {
                     b.Property<Guid>("Id")
@@ -187,6 +263,39 @@ namespace PuntoVenta.Api.Data.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("PuntoVenta.Api.Data.Sale", b =>
+                {
+                    b.HasOne("PuntoVenta.Api.Data.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PuntoVenta.Api.Data.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("PuntoVenta.Api.Data.SaleItem", b =>
+                {
+                    b.HasOne("PuntoVenta.Api.Data.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("PuntoVenta.Api.Data.Sale", "Sale")
+                        .WithMany("Items")
+                        .HasForeignKey("TenantId", "SaleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+
+                    b.Navigation("Sale");
+                });
+
             modelBuilder.Entity("PuntoVenta.Api.Data.User", b =>
                 {
                     b.HasOne("PuntoVenta.Api.Data.Tenant", "Tenant")
@@ -196,6 +305,11 @@ namespace PuntoVenta.Api.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("PuntoVenta.Api.Data.Sale", b =>
+                {
+                    b.Navigation("Items");
                 });
 #pragma warning restore 612, 618
         }

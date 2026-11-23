@@ -8,6 +8,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<User> Users => Set<User>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Product> Products => Set<Product>();
+    public DbSet<Sale> Sales => Set<Sale>();
+    public DbSet<SaleItem> SaleItems => Set<SaleItem>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -43,6 +45,29 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.Property(x => x.Name).HasMaxLength(200).IsRequired();
             e.HasIndex(x => new { x.TenantId, x.Barcode }).IsUnique();
             e.HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Sale>(e =>
+        {
+            e.HasKey(x => new { x.TenantId, x.Id });
+            e.Property(x => x.PaymentMethod).HasMaxLength(20).IsRequired();
+            e.Property(x => x.Status).HasMaxLength(20).IsRequired();
+            e.HasIndex(x => new { x.TenantId, x.Date });
+            e.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<SaleItem>(e =>
+        {
+            e.HasKey(x => new { x.TenantId, x.SaleId, x.Id });
+            e.Property(x => x.Description).IsRequired();
+            e.HasOne(x => x.Sale).WithMany(x => x.Items)
+                .HasForeignKey(x => new { x.TenantId, x.SaleId })
+                .HasPrincipalKey(x => new { x.TenantId, x.Id })
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Product).WithMany()
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

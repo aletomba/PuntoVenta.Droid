@@ -4,6 +4,7 @@ using PuntoVenta.Api.Auth;
 using PuntoVenta.Api.Data;
 using PuntoVenta.Api.Health;
 using PuntoVenta.Api.Products;
+using PuntoVenta.Api.Sales;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -11,6 +12,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddPuntoVentaAuth(builder.Configuration);
 builder.Services.AddPuntoVentaProducts();
+builder.Services.AddPuntoVentaSales();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddDbContext<AppDbContext>(options =>
