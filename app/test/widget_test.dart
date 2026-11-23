@@ -10,4 +10,14 @@ void main() {
     expect(find.text('Nueva venta'), findsOneWidget);
     expect(find.text('Base de la aplicación lista'), findsOneWidget);
   });
+
+  testWidgets('opens the login form from the POS home screen', (tester) async {
+    await tester.pumpWidget(const ProviderScope(child: PuntoVentaApp()));
+    await tester.tap(find.byTooltip('Iniciar sesión'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Correo electrónico'), findsOneWidget);
+    expect(find.text('Contraseña'), findsOneWidget);
+    expect(find.text('Ingresar'), findsOneWidget);
+  });
 }

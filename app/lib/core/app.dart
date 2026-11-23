@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../features/auth/login_screen.dart';
 import '../features/products/product_form_screen.dart';
 import '../features/products/products_list_screen.dart';
 import '../features/sales/checkout_screen.dart';
@@ -12,6 +13,7 @@ final routerProvider = Provider<GoRouter>((ref) {
   final router = GoRouter(
     routes: [
       GoRoute(path: '/', builder: (context, state) => const HomeScreen()),
+      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(
         path: '/sales/new',
         builder: (context, state) => const NewSaleScreen(),
@@ -81,7 +83,16 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Punto de Venta')),
+      appBar: AppBar(
+        title: const Text('Punto de Venta'),
+        actions: [
+          IconButton(
+            tooltip: 'Iniciar sesión',
+            onPressed: () => context.push('/login'),
+            icon: const Icon(Icons.login),
+          ),
+        ],
+      ),
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
