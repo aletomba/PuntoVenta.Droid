@@ -15,6 +15,56 @@ class SaleValidationException implements Exception {
   String toString() => message;
 }
 
+class SaleDetails {
+  const SaleDetails({required this.sale, required this.items});
+
+  final Sale sale;
+  final List<SaleItem> items;
+}
+
+class CashCloseSummary {
+  const CashCloseSummary({
+    required this.day,
+    required this.totalCents,
+    required this.byPaymentMethod,
+    required this.saleCount,
+    required this.pendingSyncCount,
+  });
+
+  factory CashCloseSummary.fromSales(DateTime day, Iterable<Sale> sales) {
+    final daySales = sales
+        .where((sale) => _sameUtcDay(sale.date, day))
+        .toList();
+    final activeSales = daySales
+        .where((sale) => sale.status == 'active')
+        .toList();
+    final byPaymentMethod = {
+      for (final method in SalesRepository.paymentMethods) method: 0,
+    };
+    for (final sale in activeSales) {
+      byPaymentMethod.update(
+        sale.paymentMethod,
+        (total) => total + sale.totalCents,
+        ifAbsent: () => sale.totalCents,
+      );
+    }
+
+    return CashCloseSummary(
+      day: DateTime.utc(day.year, day.month, day.day),
+      totalCents: activeSales.fold(0, (total, sale) => total + sale.totalCents),
+      byPaymentMethod: Map.unmodifiable(byPaymentMethod),
+      saleCount: activeSales.length,
+      pendingSyncCount: daySales.where((sale) => !sale.synced).length,
+    );
+  }
+
+  final DateTime day;
+  final int totalCents;
+  final Map<String, int> byPaymentMethod;
+  final int saleCount;
+  final int pendingSyncCount;
+}
+
 class SalesRepository {
   SalesRepository(this._database);
 
@@ -28,6 +78,30 @@ class SalesRepository {
 
   final AppDatabase _database;
   final _uuid = const Uuid();
+
+  Stream<List<Sale>> watchSales() {
+    return (_database.select(
+      _database.sales,
+    )..orderBy([(sale) => OrderingTerm.desc(sale.date)])).watch();
+  }
+
+  Future<SaleDetails?> getSaleDetails(String saleId) async {
+    final sale = await (_database.select(
+      _database.sales,
+    )..where((candidate) => candidate.id.equals(saleId))).getSingleOrNull();
+    if (sale == null) {
+      return null;
+    }
+
+    final items = await (_database.select(
+      _database.saleItems,
+    )..where((item) => item.saleId.equals(saleId))).get();
+    return SaleDetails(sale: sale, items: items);
+  }
+
+  Stream<CashCloseSummary> watchCashClose(DateTime day) {
+    return watchSales().map((sales) => CashCloseSummary.fromSales(day, sales));
+  }
 
   Future<String> createSale({
     required CartState cart,
@@ -138,3 +212,27 @@ class SalesRepository {
 final salesRepositoryProvider = Provider<SalesRepository>((ref) {
   return SalesRepository(ref.watch(appDatabaseProvider));
 });
+
+final salesHistoryProvider = StreamProvider<List<Sale>>((ref) {
+  return ref.watch(salesRepositoryProvider).watchSales();
+});
+
+final saleDetailsProvider = FutureProvider.family<SaleDetails?, String>((
+  ref,
+  saleId,
+) {
+  return ref.watch(salesRepositoryProvider).getSaleDetails(saleId);
+});
+
+final cashCloseSummaryProvider =
+    StreamProvider.family<CashCloseSummary, DateTime>((ref, day) {
+      return ref.watch(salesRepositoryProvider).watchCashClose(day);
+    });
+
+bool _sameUtcDay(DateTime first, DateTime second) {
+  final firstUtc = first.toUtc();
+  final secondUtc = second.toUtc();
+  return firstUtc.year == secondUtc.year &&
+      firstUtc.month == secondUtc.month &&
+      firstUtc.day == secondUtc.day;
+}

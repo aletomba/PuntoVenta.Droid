@@ -1,4 +1,4 @@
-﻿import 'package:drift/native.dart';
+import 'package:drift/native.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:punto_venta/data/local/app_database.dart';
@@ -187,6 +187,84 @@ void main() {
     );
     expect(await database.select(database.sales).get(), isEmpty);
   });
+
+  test('loads a sale with its line items for the detail view', () async {
+    final saleId = await salesRepository.createSale(
+      cart: const CartState(
+        items: [
+          CartItem(
+            id: 'free-line',
+            description: 'Bolsa',
+            unitPriceCents: 50,
+            quantity: 2,
+          ),
+        ],
+      ),
+      paymentMethod: 'cash',
+    );
+
+    final details = await salesRepository.getSaleDetails(saleId);
+
+    expect(details, isNotNull);
+    expect(details!.sale.totalCents, 100);
+    expect(details.sale.paymentMethod, 'cash');
+    expect(details.items, hasLength(1));
+    expect(details.items.single.description, 'Bolsa');
+    expect(await salesRepository.getSaleDetails('missing'), isNull);
+  });
+
+  test(
+    'cash close totals active sales by UTC day and payment method',
+    () async {
+      await database.batch((batch) {
+        batch.insertAll(database.sales, [
+          SalesCompanion.insert(
+            id: 'cash-sale',
+            date: DateTime.utc(2026, 1, 1, 23, 30),
+            totalCents: 125,
+            paymentMethod: 'cash',
+            status: 'active',
+            synced: const Value(true),
+          ),
+          SalesCompanion.insert(
+            id: 'transfer-sale',
+            date: DateTime.utc(2026, 1, 1, 2),
+            totalCents: 75,
+            paymentMethod: 'transfer',
+            status: 'active',
+            synced: const Value(false),
+          ),
+          SalesCompanion.insert(
+            id: 'voided-sale',
+            date: DateTime.utc(2026, 1, 1, 3),
+            totalCents: 900,
+            paymentMethod: 'cash',
+            status: 'voided',
+            synced: const Value(false),
+          ),
+          SalesCompanion.insert(
+            id: 'next-utc-day-sale',
+            date: DateTime.utc(2026, 1, 2, 1),
+            totalCents: 250,
+            paymentMethod: 'debit',
+            status: 'active',
+            synced: const Value(false),
+          ),
+        ]);
+      });
+
+      final summary = await salesRepository
+          .watchCashClose(DateTime.utc(2026, 1, 1))
+          .first;
+
+      expect(summary.totalCents, 200);
+      expect(summary.saleCount, 2);
+      expect(summary.byPaymentMethod['cash'], 125);
+      expect(summary.byPaymentMethod['transfer'], 75);
+      expect(summary.byPaymentMethod['debit'], 0);
+      expect(summary.pendingSyncCount, 2);
+    },
+  );
 
   test('rejects duplicate product barcodes locally', () async {
     await productsRepository.create(

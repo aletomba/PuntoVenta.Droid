@@ -5,8 +5,11 @@ import 'package:go_router/go_router.dart';
 import '../features/auth/login_screen.dart';
 import '../features/products/product_form_screen.dart';
 import '../features/products/products_list_screen.dart';
+import '../features/sales/cash_close_screen.dart';
 import '../features/sales/checkout_screen.dart';
+import '../features/sales/sale_detail_screen.dart';
 import '../features/sales/new_sale_screen.dart';
+import '../features/sales/sales_history_screen.dart';
 import '../features/scanner/scanner_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -14,6 +17,21 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(path: '/', builder: (context, state) => const HomeScreen()),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      GoRoute(
+        path: '/sales/history',
+        builder: (context, state) => const SalesHistoryScreen(),
+      ),
+      GoRoute(
+        path: '/sales/detail/:id',
+        builder: (context, state) {
+          final saleId = state.pathParameters['id']!;
+          return SaleDetailScreen(saleId: saleId);
+        },
+      ),
+      GoRoute(
+        path: '/cash-close',
+        builder: (context, state) => const CashCloseScreen(),
+      ),
       GoRoute(
         path: '/sales/new',
         builder: (context, state) => const NewSaleScreen(),
@@ -113,6 +131,18 @@ class HomeScreen extends StatelessWidget {
               onPressed: () => context.push('/products'),
               icon: const Icon(Icons.inventory_2_outlined),
               label: const Text('Productos'),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () => context.push('/sales/history'),
+              icon: const Icon(Icons.receipt_long),
+              label: const Text('Historial de ventas'),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () => context.push('/cash-close'),
+              icon: const Icon(Icons.point_of_sale),
+              label: const Text('Cierre de caja'),
             ),
             const SizedBox(height: 16),
             const Text('Base de la aplicación lista'),

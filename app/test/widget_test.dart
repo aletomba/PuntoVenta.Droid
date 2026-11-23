@@ -9,6 +9,8 @@ void main() {
     expect(find.text('Punto de Venta'), findsOneWidget);
     expect(find.text('Nueva venta'), findsOneWidget);
     expect(find.text('Base de la aplicación lista'), findsOneWidget);
+    expect(find.text('Historial de ventas'), findsOneWidget);
+    expect(find.text('Cierre de caja'), findsOneWidget);
   });
 
   testWidgets('opens the login form from the POS home screen', (tester) async {
