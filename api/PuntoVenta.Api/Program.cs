@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using PuntoVenta.Api.Auth;
+using PuntoVenta.Api.CashClose;
 using PuntoVenta.Api.Data;
 using PuntoVenta.Api.Health;
 using PuntoVenta.Api.Products;
@@ -11,6 +12,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddPuntoVentaAuth(builder.Configuration);
+builder.Services.AddPuntoVentaCashClose();
 builder.Services.AddPuntoVentaProducts();
 builder.Services.AddPuntoVentaSales();
 builder.Services.AddEndpointsApiExplorer();
