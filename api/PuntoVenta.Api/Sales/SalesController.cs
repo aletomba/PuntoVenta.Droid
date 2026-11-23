@@ -32,4 +32,19 @@ public sealed class SalesController(ISalesService sales) : ControllerBase
             ct);
         return CreatedAtAction(nameof(List), null, sale);
     }
+
+    [HttpPost("{id:guid}/void")]
+    [Authorize(Policy = AuthPolicies.AdminOnly)]
+    [ProducesResponseType<SaleResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiError>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiError>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ApiError>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ApiError>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<SaleResponse>> Void(Guid id, VoidSaleRequest request, CancellationToken ct)
+    {
+        if (User.GetTenantId() is not Guid tenantId || User.GetUserId() is not Guid userId)
+            return Unauthorized(new ApiError("unauthorized", "El token no contiene los datos de usuario requeridos."));
+
+        return Ok(await sales.VoidAsync(tenantId, userId, id, request.Reason!, ct));
+    }
 }

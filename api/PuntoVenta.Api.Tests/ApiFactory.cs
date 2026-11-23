@@ -70,8 +70,15 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
                 services.Remove(d);
             }
 
-            // SQLite (archivo temporal) soporta ExecuteUpdate y concurrencia real entre contextos.
-            services.AddDbContext<AppDbContext>(o => o.UseSqlite($"Data Source={_dbPath};Pooling=False"));
+            // Debe apuntar a una base de pruebas dedicada: EnsureCreated crea tablas y los tests insertan datos.
+            var postgresConnection = Environment.GetEnvironmentVariable("PUNTOVENTA_TEST_POSTGRES");
+            services.AddDbContext<AppDbContext>(options =>
+            {
+                if (string.IsNullOrEmpty(postgresConnection))
+                    options.UseSqlite($"Data Source={_dbPath};Pooling=False");
+                else
+                    options.UseNpgsql(postgresConnection);
+            });
             services.RemoveAll<TimeProvider>();
             services.AddSingleton<TimeProvider>(Clock);
             services.AddControllers().AddApplicationPart(typeof(PermissionProbeController).Assembly);

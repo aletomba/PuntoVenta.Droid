@@ -4,3 +4,15 @@ GET {{PuntoVenta.Api_HostAddress}}/weatherforecast/
 Accept: application/json
 
 ###
+
+@accessToken = REEMPLAZAR_TOKEN_ADMIN
+@saleId = 00000000-0000-0000-0000-000000000001
+
+### Anular venta (solo Admin)
+POST {{PuntoVenta.Api_HostAddress}}/sales/{{saleId}}/void
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "reason": "Anulación solicitada"
+}
