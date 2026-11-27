@@ -4,7 +4,7 @@ Monorepo para el MVP Android de punto de venta. La aplicación Flutter es offlin
 
 ## Requisitos locales
 
-- Flutter stable y Android SDK (aceptar licencias con `flutter doctor --android-licenses`).
+- Flutter 3.47.7 y Android SDK (aceptar licencias con `flutter doctor --android-licenses`).
 - .NET SDK 10 LTS.
 - Docker Desktop con Docker Compose para PostgreSQL.
 - Node.js compatible con la versión instalada localmente.
